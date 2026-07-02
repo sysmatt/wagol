@@ -1,0 +1,15 @@
+{
+  "name": "wagol",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "wagol_bg.wasm",
+    "wagol.js",
+    "wagol.d.ts"
+  ],
+  "main": "wagol.js",
+  "types": "wagol.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
