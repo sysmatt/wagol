@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>wagol — background mode demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            /* Leave this transparent (or unset) — the canvas behind it is
+               the real backdrop. An opaque body background would hide it. */
+            background: transparent;
+            color: #e8e8ec;
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.5;
+        }
+
+        #gol-background {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            display: block;
+            pointer-events: none;
+            /* Keeps the upscaled low-res grid crisp/blocky rather than blurry. */
+            image-rendering: pixelated;
+        }
+
+        /* Everything below is just example page content demonstrating the
+           pattern: give any content block its own opaque background so
+           it's legible over the animated backdrop. Replace with your own
+           markup — the canvas + its CSS above is the only part that's
+           actually part of "background mode". */
+        main {
+            max-width: 42rem;
+            margin: 0 auto;
+            padding: 4rem 1.5rem 8rem;
+        }
+
+        .panel {
+            background: rgba(12, 14, 20, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        h1 { font-size: 2.25rem; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.4rem; margin-bottom: 0.75rem; }
+        p { margin-bottom: 1rem; color: #c4c4cc; }
+        p:last-child { margin-bottom: 0; }
+    </style>
+</head>
+<body>
+    <canvas id="gol-background"></canvas>
+
+    <main>
+        <div class="panel">
+            <h1>Page title</h1>
+            <p>This text sits in an opaque panel over the Game of Life backdrop. The simulation keeps running and scrolls with the page as a fixed backdrop — it doesn't move when you scroll.</p>
+        </div>
+
+        <div class="panel">
+            <h2>Another section</h2>
+            <p>Any block of real content — cards, sidebars, forms — just needs its own background color to stay legible. The gaps between panels (and the page margins) are where the backdrop shows through.</p>
+            <p>Adjust the palette, cell size, and simulation speed in <code>background.js</code>.</p>
+        </div>
+    </main>
+
+    <script type="module" src="background.js"></script>
+</body>
+</html>

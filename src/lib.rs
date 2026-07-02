@@ -26,9 +26,19 @@ const MATRIX_STOPS: Stops = &[
     (1.0, 0, 20, 5),
 ];
 
+// Low-contrast, desaturated blue-grey — for use as a page background behind
+// real content, where the simulation shouldn't compete with foreground text.
+const SLATE_STOPS: Stops = &[
+    (0.0, 190, 200, 210),
+    (0.3, 120, 130, 145),
+    (0.7, 70, 75, 90),
+    (1.0, 25, 25, 32),
+];
+
 const THEME_FIRE: u8 = 0;
 const THEME_COSMIC: u8 = 1;
 const THEME_MATRIX: u8 = 2;
+const THEME_SLATE: u8 = 3;
 
 fn lerp_stops(t: f32, stops: Stops) -> (u8, u8, u8) {
     for w in stops.windows(2) {
@@ -49,6 +59,7 @@ fn theme_stops(theme: u8) -> Stops {
         THEME_FIRE => FIRE_STOPS,
         THEME_COSMIC => COSMIC_STOPS,
         THEME_MATRIX => MATRIX_STOPS,
+        THEME_SLATE => SLATE_STOPS,
         _ => FIRE_STOPS,
     }
 }

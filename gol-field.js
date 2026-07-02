@@ -1,0 +1,135 @@
+// Shared core: wires a wasm Universe up to a <canvas> and a render loop.
+// Used by both index.js (full-page holding page) and background.js
+// (backdrop behind arbitrary page content).
+import init, { Universe, wasm_memory } from './pkg/wagol.js';
+
+export const THEME_IDS = { fire: 0, cosmic: 1, matrix: 2, slate: 3 };
+
+let wasmReady = null;
+function ensureWasm() {
+    if (!wasmReady) wasmReady = init();
+    return wasmReady;
+}
+
+const defaultSizeSource = () => ({ width: window.innerWidth, height: window.innerHeight });
+
+/**
+ * Starts a Game of Life simulation rendering into `canvas`.
+ *
+ * options:
+ *   theme         'fire' | 'cosmic' | 'matrix' | 'slate' (default 'cosmic')
+ *   cellSize      CSS pixels per simulated cell (default 1). Values > 1
+ *                 simulate a smaller grid and let the browser upscale the
+ *                 canvas, which is both cheaper to compute and reads as a
+ *                 chunkier, calmer backdrop.
+ *   ticksPerFrame Advance the simulation once every N animation frames
+ *                 (default 1 = every frame). Higher values slow the
+ *                 simulation down and reduce CPU/GPU load.
+ *   interactive   If true, dragging the mouse over the canvas scatters live
+ *                 cells (default false).
+ *   brush         { radius, density } for the interactive scatter brush.
+ *   sizeSource    () => { width, height } the field should fill. Defaults
+ *                 to the full browser viewport.
+ *
+ * Returns { universe, destroy() }.
+ */
+export async function createField(canvas, options = {}) {
+    await ensureWasm();
+
+    const {
+        theme = 'cosmic',
+        cellSize = 1,
+        ticksPerFrame = 1,
+        interactive = false,
+        brush = { radius: 35, density: 0.35 },
+        sizeSource = defaultSizeSource,
+    } = options;
+
+    const ctx = canvas.getContext('2d');
+    const mem = wasm_memory();
+    const themeId = THEME_IDS[theme] ?? THEME_IDS.cosmic;
+
+    let gridWidth = 0;
+    let gridHeight = 0;
+    let universe = null;
+    let animId = null;
+    let frameCount = 0;
+
+    function applySize() {
+        const { width, height } = sizeSource();
+        gridWidth = Math.max(1, Math.ceil(width / cellSize));
+        gridHeight = Math.max(1, Math.ceil(height / cellSize));
+        canvas.width = gridWidth;
+        canvas.height = gridHeight;
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+    }
+
+    applySize();
+    universe = Universe.new(gridWidth, gridHeight, themeId);
+
+    function getGridPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = gridWidth / rect.width;
+        const scaleY = gridHeight / rect.height;
+        return {
+            x: Math.floor((e.clientX - rect.left) * scaleX),
+            y: Math.floor((e.clientY - rect.top) * scaleY),
+        };
+    }
+
+    let isDrawing = false;
+    function onMouseDown(e) {
+        isDrawing = true;
+        const { x, y } = getGridPos(e);
+        universe.scatter_cells(x, y, brush.radius, brush.density);
+    }
+    function onMouseMove(e) {
+        if (!isDrawing) return;
+        const { x, y } = getGridPos(e);
+        universe.scatter_cells(x, y, brush.radius, brush.density);
+    }
+    function onMouseUp() { isDrawing = false; }
+
+    if (interactive) {
+        canvas.addEventListener('mousedown', onMouseDown);
+        canvas.addEventListener('mousemove', onMouseMove);
+        canvas.addEventListener('mouseup', onMouseUp);
+        canvas.addEventListener('mouseleave', onMouseUp);
+    }
+
+    function render() {
+        if (frameCount % ticksPerFrame === 0) {
+            universe.tick();
+            const ptr = universe.pixels_ptr();
+            const pixels = new Uint8ClampedArray(mem.buffer, ptr, gridWidth * gridHeight * 4);
+            ctx.putImageData(new ImageData(pixels, gridWidth, gridHeight), 0, 0);
+        }
+        frameCount++;
+        animId = requestAnimationFrame(render);
+    }
+
+    function onResize() {
+        cancelAnimationFrame(animId);
+        applySize();
+        universe.resize(gridWidth, gridHeight);
+        animId = requestAnimationFrame(render);
+    }
+    window.addEventListener('resize', onResize);
+
+    animId = requestAnimationFrame(render);
+
+    return {
+        universe,
+        destroy() {
+            cancelAnimationFrame(animId);
+            window.removeEventListener('resize', onResize);
+            if (interactive) {
+                canvas.removeEventListener('mousedown', onMouseDown);
+                canvas.removeEventListener('mousemove', onMouseMove);
+                canvas.removeEventListener('mouseup', onMouseUp);
+                canvas.removeEventListener('mouseleave', onMouseUp);
+            }
+        },
+    };
+}
