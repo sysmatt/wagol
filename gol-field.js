@@ -5,6 +5,12 @@ import init, { Universe, wasm_memory } from './pkg/wagol.js';
 
 export const THEME_IDS = { fire: 0, cosmic: 1, matrix: 2, slate: 3 };
 
+// Background "activity" palettes: paint dead cells with a running average of
+// how often they've recently been alive, instead of flat black. Independent
+// of THEME_IDS above -- any foreground theme can pair with any activity
+// theme (or none, which reproduces the original flat-black behavior).
+export const ACTIVITY_THEME_IDS = { ice: 0, ember: 1, verdant: 2, violet: 3 };
+
 let wasmReady = null;
 function ensureWasm() {
     if (!wasmReady) wasmReady = init();
@@ -18,6 +24,17 @@ const defaultSizeSource = () => ({ width: window.innerWidth, height: window.inne
  *
  * options:
  *   theme         'fire' | 'cosmic' | 'matrix' | 'slate' (default 'cosmic')
+ *   activityTheme 'ice' | 'ember' | 'verdant' | 'violet' | null (default
+ *                 null). When set, cells that are currently dead are shaded
+ *                 by a running average of how often they've recently been
+ *                 alive, instead of flat black -- a low-key heatmap of
+ *                 activity that fills in the empty space once the
+ *                 simulation settles down. Independent of `theme`, so any
+ *                 combination works.
+ *   activityDecay EMA decay rate per tick for the activity heatmap (default
+ *                 0.005). Smaller = longer memory / slower fade, larger =
+ *                 more reactive to recent activity. Only relevant when
+ *                 activityTheme is set.
  *   cellSize      CSS pixels per simulated cell (default 1). Values > 1
  *                 simulate a smaller grid and let the browser upscale the
  *                 canvas, which is both cheaper to compute and reads as a
@@ -38,6 +55,8 @@ export async function createField(canvas, options = {}) {
 
     const {
         theme = 'cosmic',
+        activityTheme = null,
+        activityDecay,
         cellSize = 1,
         ticksPerFrame = 1,
         interactive = false,
@@ -48,6 +67,7 @@ export async function createField(canvas, options = {}) {
     const ctx = canvas.getContext('2d');
     const mem = wasm_memory();
     const themeId = THEME_IDS[theme] ?? THEME_IDS.cosmic;
+    const activityThemeId = activityTheme == null ? undefined : (ACTIVITY_THEME_IDS[activityTheme] ?? ACTIVITY_THEME_IDS.ice);
 
     let gridWidth = 0;
     let gridHeight = 0;
@@ -66,7 +86,7 @@ export async function createField(canvas, options = {}) {
     }
 
     applySize();
-    universe = Universe.new(gridWidth, gridHeight, themeId);
+    universe = Universe.new(gridWidth, gridHeight, themeId, activityThemeId, activityDecay);
 
     function getGridPos(e) {
         const rect = canvas.getBoundingClientRect();

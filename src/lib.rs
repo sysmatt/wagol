@@ -40,6 +40,45 @@ const THEME_COSMIC: u8 = 1;
 const THEME_MATRIX: u8 = 2;
 const THEME_SLATE: u8 = 3;
 
+// Background "activity" palettes: shown wherever a cell is currently dead,
+// colored by a running average of how often that cell has been alive
+// recently (see `activity` field). Independent of the foreground theme, so
+// any combination of foreground + background palette can be selected.
+const BG_ICE_STOPS: Stops = &[
+    (0.0, 0, 0, 0),
+    (0.4, 10, 20, 60),
+    (0.7, 30, 70, 160),
+    (1.0, 140, 210, 255),
+];
+
+const BG_EMBER_STOPS: Stops = &[
+    (0.0, 0, 0, 0),
+    (0.4, 60, 10, 5),
+    (0.7, 160, 40, 0),
+    (1.0, 255, 170, 60),
+];
+
+const BG_VERDANT_STOPS: Stops = &[
+    (0.0, 0, 0, 0),
+    (0.4, 5, 40, 15),
+    (0.7, 20, 120, 50),
+    (1.0, 140, 255, 170),
+];
+
+const BG_VIOLET_STOPS: Stops = &[
+    (0.0, 0, 0, 0),
+    (0.4, 35, 10, 55),
+    (0.7, 110, 30, 160),
+    (1.0, 230, 150, 255),
+];
+
+const BG_THEME_ICE: u8 = 0;
+const BG_THEME_EMBER: u8 = 1;
+const BG_THEME_VERDANT: u8 = 2;
+const BG_THEME_VIOLET: u8 = 3;
+
+const DEFAULT_ACTIVITY_DECAY: f32 = 0.005;
+
 fn lerp_stops(t: f32, stops: Stops) -> (u8, u8, u8) {
     for w in stops.windows(2) {
         let (t0, r0, g0, b0) = w[0];
@@ -64,15 +103,28 @@ fn theme_stops(theme: u8) -> Stops {
     }
 }
 
+fn bg_theme_stops(bg_theme: u8) -> Stops {
+    match bg_theme {
+        BG_THEME_ICE => BG_ICE_STOPS,
+        BG_THEME_EMBER => BG_EMBER_STOPS,
+        BG_THEME_VERDANT => BG_VERDANT_STOPS,
+        BG_THEME_VIOLET => BG_VIOLET_STOPS,
+        _ => BG_ICE_STOPS,
+    }
+}
+
 #[wasm_bindgen]
 pub struct Universe {
     width: u32,
     height: u32,
     theme: u8,
+    bg_theme: Option<u8>,
+    activity_decay: f32,
     cells: Vec<u8>,
     next: Vec<u8>,
     age: Vec<u32>,
     next_age: Vec<u32>,
+    activity: Vec<f32>,
     pixels: Vec<u8>,
 }
 
@@ -85,26 +137,41 @@ impl Universe {
         lerp_stops(t, theme_stops(self.theme))
     }
 
-    fn seed(width: u32, height: u32, theme: u8) -> Universe {
+    fn activity_to_color(&self, activity: f32) -> (u8, u8, u8) {
+        match self.bg_theme {
+            None => (0, 0, 0),
+            Some(bg_theme) => lerp_stops(activity.clamp(0.0, 1.0), bg_theme_stops(bg_theme)),
+        }
+    }
+
+    fn seed(width: u32, height: u32, theme: u8, bg_theme: Option<u8>, activity_decay: f32) -> Universe {
         let size = (width * height) as usize;
         let cells: Vec<u8> = (0..size)
             .map(|_| if js_sys::Math::random() < 0.5 { 1 } else { 0 })
             .collect();
         let age: Vec<u32> = cells.iter().map(|&c| c as u32).collect();
+        let activity: Vec<f32> = cells.iter().map(|&c| c as f32).collect();
 
         let mut universe = Universe {
             width,
             height,
             theme,
+            bg_theme,
+            activity_decay,
             cells,
             next: vec![0u8; size],
             age,
             next_age: vec![0u32; size],
+            activity,
             pixels: vec![0u8; size * 4],
         };
 
         for i in 0..size {
-            let (r, g, b) = universe.age_to_color(universe.age[i]);
+            let (r, g, b) = if universe.age[i] > 0 {
+                universe.age_to_color(universe.age[i])
+            } else {
+                universe.activity_to_color(universe.activity[i])
+            };
             universe.pixels[i * 4] = r;
             universe.pixels[i * 4 + 1] = g;
             universe.pixels[i * 4 + 2] = b;
@@ -117,8 +184,8 @@ impl Universe {
 
 #[wasm_bindgen]
 impl Universe {
-    pub fn new(width: u32, height: u32, theme: u8) -> Universe {
-        Universe::seed(width, height, theme)
+    pub fn new(width: u32, height: u32, theme: u8, bg_theme: Option<u8>, activity_decay: Option<f32>) -> Universe {
+        Universe::seed(width, height, theme, bg_theme, activity_decay.unwrap_or(DEFAULT_ACTIVITY_DECAY))
     }
 
     pub fn tick(&mut self) {
@@ -147,7 +214,14 @@ impl Universe {
                 self.next[idx] = alive as u8;
                 self.next_age[idx] = if alive { self.age[idx] + 1 } else { 0 };
 
-                let (r, g, b) = self.age_to_color(self.next_age[idx]);
+                let alive_f = alive as u8 as f32;
+                self.activity[idx] += self.activity_decay * (alive_f - self.activity[idx]);
+
+                let (r, g, b) = if alive {
+                    self.age_to_color(self.next_age[idx])
+                } else {
+                    self.activity_to_color(self.activity[idx])
+                };
                 self.pixels[idx * 4] = r;
                 self.pixels[idx * 4 + 1] = g;
                 self.pixels[idx * 4 + 2] = b;
@@ -201,7 +275,7 @@ impl Universe {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        *self = Universe::seed(width, height, self.theme);
+        *self = Universe::seed(width, height, self.theme, self.bg_theme, self.activity_decay);
     }
 }
 

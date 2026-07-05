@@ -21,10 +21,12 @@ export class Universe {
      * @param {number} width
      * @param {number} height
      * @param {number} theme
+     * @param {number | null} [bg_theme]
+     * @param {number | null} [activity_decay]
      * @returns {Universe}
      */
-    static new(width, height, theme) {
-        const ret = wasm.universe_new(width, height, theme);
+    static new(width, height, theme, bg_theme, activity_decay) {
+        const ret = wasm.universe_new(width, height, theme, isLikeNone(bg_theme) ? 0xFFFFFF : bg_theme, isLikeNone(activity_decay) ? Number.MAX_SAFE_INTEGER : Math.fround(activity_decay));
         return Universe.__wrap(ret);
     }
     /**
@@ -110,6 +112,10 @@ function getUint8ArrayMemory0() {
         cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
     }
     return cachedUint8ArrayMemory0;
+}
+
+function isLikeNone(x) {
+    return x === undefined || x === null;
 }
 
 let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
