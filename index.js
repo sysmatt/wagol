@@ -6,9 +6,15 @@ import { createField } from './gol-field.js';
 const CONFIG = {
     theme: 'fire', // 'cosmic' | 'fire' | 'matrix' | 'slate'
     activityTheme: 'ice', // null | 'ice' | 'ember' | 'verdant' | 'violet'
-    // EMA weight applied per simulation tick (not per frame); valid range
-    // is (0, 1] but useful range is ~0.001-0.05. Half-life in ticks is
-    // ~0.693 / activityDecay:
+    // Cumulative mode (default): each tick a cell is alive nudges its
+    // background brightness up permanently (never fades), capped by
+    // activityCap ticks-alive. Set false for the alternative EMA mode below,
+    // which fades back toward black as a cell goes quiet.
+    activityCumulative: true,
+    activityCap: 200, // ticks-alive to reach full brightness in cumulative mode
+    // EMA weight applied per simulation tick (not per frame); only used when
+    // activityCumulative is false. Valid range is (0, 1] but useful range is
+    // ~0.001-0.05. Half-life in ticks is ~0.693 / activityDecay:
     //   0.001 -> ~693 ticks (~11.6s @60 ticks/s) -- very slow drift
     //   0.005 -> ~139 ticks (~2.3s)  -- smooth heatmap w/ visible trails (default)
     //   0.02  -> ~35 ticks  (~0.6s)  -- fairly reactive, still smoothed
@@ -61,6 +67,8 @@ async function run() {
     await createField(canvas, {
         theme: CONFIG.theme,
         activityTheme: CONFIG.activityTheme,
+        activityCumulative: CONFIG.activityCumulative,
+        activityCap: CONFIG.activityCap,
         activityDecay: CONFIG.activityDecay,
         interactive: true,
         brush: CONFIG.brush,

@@ -78,6 +78,8 @@ const BG_THEME_VERDANT: u8 = 2;
 const BG_THEME_VIOLET: u8 = 3;
 
 const DEFAULT_ACTIVITY_DECAY: f32 = 0.005;
+const DEFAULT_ACTIVITY_CUMULATIVE: bool = true;
+const DEFAULT_ACTIVITY_CAP: f32 = 200.0;
 
 fn lerp_stops(t: f32, stops: Stops) -> (u8, u8, u8) {
     for w in stops.windows(2) {
@@ -120,6 +122,8 @@ pub struct Universe {
     theme: u8,
     bg_theme: Option<u8>,
     activity_decay: f32,
+    activity_cumulative: bool,
+    activity_cap: f32,
     cells: Vec<u8>,
     next: Vec<u8>,
     age: Vec<u32>,
@@ -140,11 +144,26 @@ impl Universe {
     fn activity_to_color(&self, activity: f32) -> (u8, u8, u8) {
         match self.bg_theme {
             None => (0, 0, 0),
-            Some(bg_theme) => lerp_stops(activity.clamp(0.0, 1.0), bg_theme_stops(bg_theme)),
+            Some(bg_theme) => {
+                let t = if self.activity_cumulative {
+                    (activity / self.activity_cap).clamp(0.0, 1.0)
+                } else {
+                    activity.clamp(0.0, 1.0)
+                };
+                lerp_stops(t, bg_theme_stops(bg_theme))
+            }
         }
     }
 
-    fn seed(width: u32, height: u32, theme: u8, bg_theme: Option<u8>, activity_decay: f32) -> Universe {
+    fn seed(
+        width: u32,
+        height: u32,
+        theme: u8,
+        bg_theme: Option<u8>,
+        activity_decay: f32,
+        activity_cumulative: bool,
+        activity_cap: f32,
+    ) -> Universe {
         let size = (width * height) as usize;
         let cells: Vec<u8> = (0..size)
             .map(|_| if js_sys::Math::random() < 0.5 { 1 } else { 0 })
@@ -158,6 +177,8 @@ impl Universe {
             theme,
             bg_theme,
             activity_decay,
+            activity_cumulative,
+            activity_cap,
             cells,
             next: vec![0u8; size],
             age,
@@ -184,8 +205,24 @@ impl Universe {
 
 #[wasm_bindgen]
 impl Universe {
-    pub fn new(width: u32, height: u32, theme: u8, bg_theme: Option<u8>, activity_decay: Option<f32>) -> Universe {
-        Universe::seed(width, height, theme, bg_theme, activity_decay.unwrap_or(DEFAULT_ACTIVITY_DECAY))
+    pub fn new(
+        width: u32,
+        height: u32,
+        theme: u8,
+        bg_theme: Option<u8>,
+        activity_decay: Option<f32>,
+        activity_cumulative: Option<bool>,
+        activity_cap: Option<f32>,
+    ) -> Universe {
+        Universe::seed(
+            width,
+            height,
+            theme,
+            bg_theme,
+            activity_decay.unwrap_or(DEFAULT_ACTIVITY_DECAY),
+            activity_cumulative.unwrap_or(DEFAULT_ACTIVITY_CUMULATIVE),
+            activity_cap.unwrap_or(DEFAULT_ACTIVITY_CAP),
+        )
     }
 
     pub fn tick(&mut self) {
@@ -214,8 +251,14 @@ impl Universe {
                 self.next[idx] = alive as u8;
                 self.next_age[idx] = if alive { self.age[idx] + 1 } else { 0 };
 
-                let alive_f = alive as u8 as f32;
-                self.activity[idx] += self.activity_decay * (alive_f - self.activity[idx]);
+                if self.activity_cumulative {
+                    if alive {
+                        self.activity[idx] += 1.0;
+                    }
+                } else {
+                    let alive_f = alive as u8 as f32;
+                    self.activity[idx] += self.activity_decay * (alive_f - self.activity[idx]);
+                }
 
                 let (r, g, b) = if alive {
                     self.age_to_color(self.next_age[idx])
@@ -275,7 +318,15 @@ impl Universe {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        *self = Universe::seed(width, height, self.theme, self.bg_theme, self.activity_decay);
+        *self = Universe::seed(
+            width,
+            height,
+            self.theme,
+            self.bg_theme,
+            self.activity_decay,
+            self.activity_cumulative,
+            self.activity_cap,
+        );
     }
 }
 

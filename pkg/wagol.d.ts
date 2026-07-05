@@ -5,7 +5,7 @@ export class Universe {
     private constructor();
     free(): void;
     [Symbol.dispose](): void;
-    static new(width: number, height: number, theme: number, bg_theme?: number | null, activity_decay?: number | null): Universe;
+    static new(width: number, height: number, theme: number, bg_theme?: number | null, activity_decay?: number | null, activity_cumulative?: boolean | null, activity_cap?: number | null): Universe;
     pixels_ptr(): number;
     resize(width: number, height: number): void;
     /**
@@ -24,7 +24,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_universe_free: (a: number, b: number) => void;
-    readonly universe_new: (a: number, b: number, c: number, d: number, e: number) => number;
+    readonly universe_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
     readonly universe_pixels_ptr: (a: number) => number;
     readonly universe_resize: (a: number, b: number, c: number) => void;
     readonly universe_scatter_cells: (a: number, b: number, c: number, d: number, e: number) => void;

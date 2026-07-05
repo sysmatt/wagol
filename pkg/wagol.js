@@ -23,10 +23,12 @@ export class Universe {
      * @param {number} theme
      * @param {number | null} [bg_theme]
      * @param {number | null} [activity_decay]
+     * @param {boolean | null} [activity_cumulative]
+     * @param {number | null} [activity_cap]
      * @returns {Universe}
      */
-    static new(width, height, theme, bg_theme, activity_decay) {
-        const ret = wasm.universe_new(width, height, theme, isLikeNone(bg_theme) ? 0xFFFFFF : bg_theme, isLikeNone(activity_decay) ? Number.MAX_SAFE_INTEGER : Math.fround(activity_decay));
+    static new(width, height, theme, bg_theme, activity_decay, activity_cumulative, activity_cap) {
+        const ret = wasm.universe_new(width, height, theme, isLikeNone(bg_theme) ? 0xFFFFFF : bg_theme, isLikeNone(activity_decay) ? Number.MAX_SAFE_INTEGER : Math.fround(activity_decay), isLikeNone(activity_cumulative) ? 0xFFFFFF : activity_cumulative ? 1 : 0, isLikeNone(activity_cap) ? Number.MAX_SAFE_INTEGER : Math.fround(activity_cap));
         return Universe.__wrap(ret);
     }
     /**

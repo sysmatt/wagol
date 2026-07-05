@@ -31,10 +31,20 @@ const defaultSizeSource = () => ({ width: window.innerWidth, height: window.inne
  *                 activity that fills in the empty space once the
  *                 simulation settles down. Independent of `theme`, so any
  *                 combination works.
+ *   activityCumulative
+ *                 If true (default), the activity heatmap is a saturating
+ *                 cumulative count -- each tick a cell is alive nudges it
+ *                 permanently brighter (capped by activityCap), and it never
+ *                 fades. If false, it's an exponential moving average that
+ *                 decays back toward black as a cell goes quiet (tune with
+ *                 activityDecay). Only relevant when activityTheme is set.
+ *   activityCap   Ticks-alive needed to reach full brightness in cumulative
+ *                 mode (default 200). Only relevant when activityCumulative
+ *                 is true.
  *   activityDecay EMA decay rate per tick for the activity heatmap (default
  *                 0.005). Smaller = longer memory / slower fade, larger =
  *                 more reactive to recent activity. Only relevant when
- *                 activityTheme is set.
+ *                 activityCumulative is false.
  *   cellSize      CSS pixels per simulated cell (default 1). Values > 1
  *                 simulate a smaller grid and let the browser upscale the
  *                 canvas, which is both cheaper to compute and reads as a
@@ -56,6 +66,8 @@ export async function createField(canvas, options = {}) {
     const {
         theme = 'cosmic',
         activityTheme = null,
+        activityCumulative,
+        activityCap,
         activityDecay,
         cellSize = 1,
         ticksPerFrame = 1,
@@ -86,7 +98,7 @@ export async function createField(canvas, options = {}) {
     }
 
     applySize();
-    universe = Universe.new(gridWidth, gridHeight, themeId, activityThemeId, activityDecay);
+    universe = Universe.new(gridWidth, gridHeight, themeId, activityThemeId, activityDecay, activityCumulative, activityCap);
 
     function getGridPos(e) {
         const rect = canvas.getBoundingClientRect();
