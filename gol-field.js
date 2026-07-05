@@ -100,34 +100,57 @@ export async function createField(canvas, options = {}) {
     applySize();
     universe = Universe.new(gridWidth, gridHeight, themeId, activityThemeId, activityDecay, activityCumulative, activityCap);
 
-    function getGridPos(e) {
+    function getGridPos(clientX, clientY) {
         const rect = canvas.getBoundingClientRect();
         const scaleX = gridWidth / rect.width;
         const scaleY = gridHeight / rect.height;
         return {
-            x: Math.floor((e.clientX - rect.left) * scaleX),
-            y: Math.floor((e.clientY - rect.top) * scaleY),
+            x: Math.floor((clientX - rect.left) * scaleX),
+            y: Math.floor((clientY - rect.top) * scaleY),
         };
     }
 
     let isDrawing = false;
     function onMouseDown(e) {
         isDrawing = true;
-        const { x, y } = getGridPos(e);
+        const { x, y } = getGridPos(e.clientX, e.clientY);
         universe.scatter_cells(x, y, brush.radius, brush.density);
     }
     function onMouseMove(e) {
         if (!isDrawing) return;
-        const { x, y } = getGridPos(e);
+        const { x, y } = getGridPos(e.clientX, e.clientY);
         universe.scatter_cells(x, y, brush.radius, brush.density);
     }
     function onMouseUp() { isDrawing = false; }
+
+    // Touch equivalents of the mouse handlers above, so dragging a finger
+    // scatters cells the same way dragging the mouse does. preventDefault()
+    // stops the touch from scrolling/zooming the page while drawing.
+    function onTouchStart(e) {
+        e.preventDefault();
+        isDrawing = true;
+        const touch = e.touches[0];
+        const { x, y } = getGridPos(touch.clientX, touch.clientY);
+        universe.scatter_cells(x, y, brush.radius, brush.density);
+    }
+    function onTouchMove(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        const { x, y } = getGridPos(touch.clientX, touch.clientY);
+        universe.scatter_cells(x, y, brush.radius, brush.density);
+    }
+    function onTouchEnd() { isDrawing = false; }
 
     if (interactive) {
         canvas.addEventListener('mousedown', onMouseDown);
         canvas.addEventListener('mousemove', onMouseMove);
         canvas.addEventListener('mouseup', onMouseUp);
         canvas.addEventListener('mouseleave', onMouseUp);
+        canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+        canvas.addEventListener('touchend', onTouchEnd);
+        canvas.addEventListener('touchcancel', onTouchEnd);
     }
 
     function render() {
@@ -161,6 +184,10 @@ export async function createField(canvas, options = {}) {
                 canvas.removeEventListener('mousemove', onMouseMove);
                 canvas.removeEventListener('mouseup', onMouseUp);
                 canvas.removeEventListener('mouseleave', onMouseUp);
+                canvas.removeEventListener('touchstart', onTouchStart);
+                canvas.removeEventListener('touchmove', onTouchMove);
+                canvas.removeEventListener('touchend', onTouchEnd);
+                canvas.removeEventListener('touchcancel', onTouchEnd);
             }
         },
     };
